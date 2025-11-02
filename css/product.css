@@ -19,36 +19,9 @@ body {
   overflow-x: hidden;
 }
 
-/* navbar (keeps existing markup; styles only) */
-.navbar {
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  background: rgba(0,0,0,0.25);
-  backdrop-filter: blur(6px);
-  border-bottom: 1px solid rgba(255,255,255,0.06);
-  padding: 14px 0;
-  z-index: 1000;
-}
-.navbar .container {
-  width: min(1100px, 92%);
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.navbar-brand { color: #fff; text-decoration: none; letter-spacing: .4px; }
-.navbar .nav-link { color: #ddd; text-decoration: none; margin-left: 18px; transition: color .2s ease; }
-.navbar .nav-link:hover { color: var(--accent); }
-.navbar-toggler { display: none; }
+/* navbar: rely on Bootstrap defaults like other pages (no overrides here) */
 
-/* navbar menu + CSS hamburger */
-.navbar-menu { margin-left: auto; }
-.navbar-menu .navbar-nav { display: flex; gap: 18px; list-style: none; margin: 0; padding: 0; align-items: center; }
-.navbar-menu .nav-item { list-style: none; }
-
-.nav-toggle { display: none; }
-.hamburger { display: none; cursor: pointer; width: 36px; height: 28px; align-items: center; justify-content: center; gap: 6px; flex-direction: column; }
-.hamburger span { display: block; width: 26px; height: 2px; background: #fff; transition: transform .2s ease, opacity .2s ease; }
+/* remove old CSS-only hamburger/nav-menu styles */
 
 /* layout */
 main { padding-top: 90px; }
@@ -237,16 +210,27 @@ main { padding-top: 90px; }
 
 /* responsive */
 @media (max-width: 992px) {
-  .hamburger { display: flex; }
-  .navbar .container { position: relative; }
-  .navbar-menu { display: none; position: absolute; top: 64px; right: 4%; left: 4%; background: rgba(15,20,32,0.98); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px; }
-  .navbar-menu .navbar-nav { flex-direction: column; align-items: flex-start; gap: 8px; }
-  .nav-toggle:checked + label.hamburger span:nth-child(1) { transform: translateY(8px) rotate(45deg); }
-  .nav-toggle:checked + label.hamburger span:nth-child(2) { opacity: 0; }
-  .nav-toggle:checked + label.hamburger span:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
-  .nav-toggle:checked ~ .navbar-menu { display: block; }
   .product-wrapper { grid-template-columns: 1fr; }
   .price-card { position: static; }
+}
+
+/* Mobile refinements for better responsiveness on small screens */
+@media (max-width: 576px) {
+  .planet-select label { font-size: .85rem; }
+  .planet-select select {
+    font-size: .95rem;
+    padding: 10px 12px;
+  }
+  .select-group .dropdown-toggle-btn {
+    font-size: .95rem;
+    padding: 10px 12px;
+  }
+  .select-group .dropdown-item {
+    font-size: .95rem;
+    padding: 9px 14px;
+  }
+  .price-card .title { font-size: 1.4rem; }
+  .price-display, .price-value { font-size: 2rem; }
 }
 
 /* --- Micro animations (triggered by JS) --- */
@@ -287,3 +271,39 @@ main { padding-top: 90px; }
   to { opacity: 1; transform: none; }
 }
 .select-group .dropdown.custom[open] .dropdown-panel { animation: panelIn .16s ease-out; }
+
+/* --- Checkout Modal styles (embedded on product page) --- */
+.checkout-modal { background: rgba(20,20,28,.98); border: 1px solid rgba(255,255,255,.12); color: #fff; border-radius: 14px; }
+.checkout-modal .modal-header { color: #fff; }
+.checkout-modal .btn-close { filter: invert(1); opacity: .9; }
+.checkout-modal .btn-close:hover { opacity: 1; }
+.checkout-modal .card { background: transparent; }
+.checkout-modal .form-control, .checkout-modal .form-select { background: rgba(18,18,26,.92); border: 1px solid rgba(255,255,255,.2); color: #fff; }
+.checkout-modal .form-control:focus, .checkout-modal .form-select:focus { border-color: var(--accent); box-shadow: 0 0 0 .2rem rgba(0,234,255,.15); }
+.checkout-modal .btn.btn-primary { background: var(--accent); border: none; color: #000; font-weight: 700; }
+.summary-row { display: flex; justify-content: space-between; margin: .5rem 0; color: #f0f0f0; font-size: 1.05rem; }
+.summary-row span:first-child{ opacity: .95; }
+.summary-row span:first-child::after{ content: ':'; margin: 0 10px; opacity: .7; }
+.summary-row span:last-child{ color: #fff; font-weight: 600; }
+.success { display:none; text-align:center; padding: 20px; }
+.success h3 { color: var(--accent); }
+.prod-img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 12px; border: 1px solid rgba(255,255,255,.12); background: #111; margin-bottom: 12px; }
+
+/* Themed modal backdrop and pop-in animation */
+.modal-backdrop.show { 
+  opacity: 1; 
+  background: radial-gradient(120% 120% at 50% 20%, rgba(0,0,0,.3), rgba(0,0,0,.8));
+  backdrop-filter: blur(3px);
+}
+.modal.fade .modal-dialog { 
+  transform: scale(.96); 
+  transition: transform .18s ease-out, opacity .18s ease-out, filter .18s ease-out; 
+  filter: drop-shadow(0 20px 50px rgba(0,0,0,.6));
+}
+.modal.show .modal-dialog { transform: scale(1); }
+.checkout-modal { 
+  box-shadow: 0 0 0 1px rgba(0,234,255,.12), 0 18px 60px rgba(0,0,0,.55);
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal.fade .modal-dialog { transition: none; }
+}
