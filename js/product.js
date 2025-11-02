@@ -23,7 +23,8 @@
     const titleEl = $('.title', wrapper);
     const titleSpans = $$('.title span', wrapper);
     const priceSpans = $$('.price-display .price', wrapper);
-    const images = $$('.product-media img', wrapper);
+  // Only target the product gallery images inside the media frame (exclude planet icon)
+  const images = $$('.product-media .frame img', wrapper);
     const summary = $('summary', details || document);
     const summaryLabels = summary ? $$('.lbl', summary) : [];
 
@@ -51,7 +52,7 @@
 
     function setImage(id){
       images.forEach(img => img.style.display = 'none');
-      const img = $('.img-' + id, wrapper);
+      const img = $('.product-media .frame .img-' + id, wrapper);
       if (img) img.style.display = 'block';
     }
 
@@ -79,14 +80,21 @@
     }
 
     // Restore selection or default to the checked radio
+    // Priority: URL ?v= → saved in localStorage → checked radio → default '2'
     let initial = '2';
-    try {
-      const saved = localStorage.getItem(persistKey);
-      if (saved && VARIANTS[saved]) initial = saved;
-    } catch {}
-    // If DOM has a different checked radio, prefer it
-    const checked = radios.find(r => r.checked);
-    if (checked && VARIANTS[checked.value]) initial = checked.value;
+    const params = new URLSearchParams(window.location.search);
+    const urlV = params.get('v');
+    if (urlV && VARIANTS[urlV]) {
+      initial = urlV;
+    } else {
+      try {
+        const saved = localStorage.getItem(persistKey);
+        if (saved && VARIANTS[saved]) initial = saved;
+      } catch {}
+      // If DOM has a different checked radio, prefer it
+      const checked = radios.find(r => r.checked);
+      if (checked && VARIANTS[checked.value]) initial = checked.value;
+    }
 
     setVariant(initial, { persist: false, closeDropdown: false });
 
@@ -108,25 +116,10 @@
       });
     }
 
-    // Navbar enhancements: close on link click / resize
-    const navToggle = $('#nav-toggle');
-    const navLinks = $$('.navbar .nav-link');
+    // (Removed legacy CSS-only navbar toggle helpers; Bootstrap handles collapse behavior)
 
-    function closeNav(){ if (navToggle) navToggle.checked = false; }
-
-    navLinks.forEach(a => a.addEventListener('click', closeNav));
-    window.addEventListener('resize', () => {
-      if (window.innerWidth >= 992) closeNav();
-    });
-    document.addEventListener('click', (e) => {
-      const nav = $('.navbar');
-      if (!nav) return;
-      if (!nav.contains(e.target)) closeNav();
-    });
-
-    // Planet dropdown behavior
-    const planetKey = 'spaceh.product.planet';
-    // Use local placeholder SVGs for each planet (media/icons/*.svg). Replace later with final licensed icons if desired.
+  // Planet dropdown behavior (custom dropdown, do not persist between visits)
+    // Use local placeholder icons for each planet (media/icons/*.png). Replace later with final licensed icons if desired.
     const PLANET_ICON = {
       Mercury: 'media/icons/mercury.png',
       Venus:   'media/icons/venus.png',
@@ -137,38 +130,42 @@
       Neptune: 'media/icons/neptune.png',
       Pluto:   'media/icons/pluto.png'
     };
-    const planetSelect = $('#planetSelect');
     const planetInfo = $('#planetInfo');
     const planetIcon = $('#planetIcon');
+    const planetSummary = $('#planetSummary');
+    const planetDetails = $('#planetDropdown');
+    const planetRadios = $$('input[name="planet"]');
     function setPlanetUI(value){
-      if (planetSelect) planetSelect.value = value;
+      // Update dropdown summary label
+      if (planetSummary) planetSummary.textContent = value ? value : '— เลือกดาวเคราะห์ —';
       if (planetInfo) {
         const url = PLANET_ICON[value];
         const label = $('.planet-label', planetInfo);
-        if (label) label.textContent = 'Selected: ' + value;
-        if (planetIcon && url) {
-          planetIcon.src = url;
-          planetIcon.style.display = 'inline-block';
-          planetIcon.width = 18;
-          planetIcon.height = 18;
-          animateOnce(planetIcon, 'pop');
+        if (label) label.textContent = value ? ('Selected: ' + value) : 'Selected: —';
+        if (planetIcon) {
+          if (url) {
+            planetIcon.src = url;
+            planetIcon.style.display = 'inline-block';
+            planetIcon.width = 18;
+            planetIcon.height = 18;
+            animateOnce(planetIcon, 'pop');
+          } else {
+            planetIcon.removeAttribute('src');
+            planetIcon.style.display = 'none';
+          }
         }
       }
     }
-    if (planetSelect) {
-      let planet = 'Mercury';
-      try {
-        const saved = localStorage.getItem(planetKey);
-        if (saved) planet = saved;
-      } catch {}
-      // Fallback if saved value is no longer available
-      if (!PLANET_ICON[planet]) planet = 'Mercury';
-      setPlanetUI(planet);
-      planetSelect.addEventListener('change', () => {
-        const val = planetSelect.value;
-        setPlanetUI(val);
-        try { localStorage.setItem(planetKey, val); } catch {}
-      });
+    // Start with no selection
+    setPlanetUI('');
+    // Wire up radios
+    if (planetRadios.length) {
+      planetRadios.forEach(r => r.addEventListener('change', () => {
+        if (r.checked) {
+          setPlanetUI(r.value);
+          if (planetDetails) planetDetails.open = false; // close panel after pick
+        }
+      }));
     }
 
     // Button ripple effect
@@ -186,6 +183,15 @@
         span.style.top = y + 'px';
         buyBtn.appendChild(span);
         span.addEventListener('animationend', () => span.remove(), { once: true });
+
+        // After ripple, open in-page checkout modal with current selection
+        setTimeout(()=>{
+          const current = wrapper?.dataset?.variant || (radios.find(r=>r.checked)?.value) || '2';
+    const pr = $$('input[name="planet"]');
+    const cpr = pr.find(x=>x.checked);
+    const planet = cpr ? cpr.value : '—';
+          openCheckoutModal(current, planet);
+        }, 80);
       });
     }
 
@@ -214,4 +220,59 @@ function animateOnce(el, className){
   void el.offsetWidth; // reflow to restart animation
   el.classList.add(className);
   el.addEventListener('animationend', () => el.classList.remove(className), { once: true });
+}
+
+// --- Embedded Checkout Modal Logic ---
+function fmtUSD(n){
+  try { return new Intl.NumberFormat('en-US').format(Number(n)); } catch { return n; }
+}
+
+function openCheckoutModal(variantId, planet){
+  const VARIANT_META = {
+    "1": { name: "SpaceTownhome", price: 9999999, img: "media/SpaceTownhome.png" },
+    "2": { name: "SpaceHouse",    price: 15999999, img: "media/SpaceHouse.png" },
+    "3": { name: "SpaceVilla",    price: 25999999, img: "media/SpaceVilla.png" }
+  };
+  const modalEl = document.getElementById('checkoutModal');
+  if (!modalEl) return;
+  const modal = (window.bootstrap && window.bootstrap.Modal) ? window.bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: true }) : null;
+
+  const meta = VARIANT_META[variantId] || VARIANT_META['2'];
+  // Populate summary
+  const img = modalEl.querySelector('#mSumImage');
+  if (img) { img.src = meta.img; img.alt = meta.name; }
+  const pName = modalEl.querySelector('#mSumProduct');
+  if (pName) pName.textContent = meta.name;
+  const pPlanet = modalEl.querySelector('#mSumPlanet');
+  if (pPlanet) pPlanet.textContent = planet || '—';
+  const pTotal = modalEl.querySelector('#mSumTotal');
+  if (pTotal) pTotal.textContent = '$ ' + fmtUSD(meta.price);
+
+  // Reset form / success state
+  const form = modalEl.querySelector('#mPayForm');
+  const btn = modalEl.querySelector('#mPayBtn');
+  const spin = modalEl.querySelector('#mPaySpin');
+  const ok = modalEl.querySelector('#mPaySuccess');
+  if (form) { form.reset(); form.style.display = 'block'; }
+  if (ok) ok.style.display = 'none';
+  if (btn) btn.disabled = false;
+  if (spin) spin.classList.add('d-none');
+
+  if (form) {
+    form.onsubmit = function(ev){
+      ev.preventDefault();
+      if (btn) btn.disabled = true;
+      if (spin) spin.classList.remove('d-none');
+      setTimeout(()=>{
+        if (spin) spin.classList.add('d-none');
+        if (ok) ok.style.display = 'block';
+        form.style.display = 'none';
+        const id = 'SH-' + Date.now().toString(36).toUpperCase();
+        const oid = modalEl.querySelector('#mOrderId');
+        if (oid) oid.textContent = id;
+      }, 1000);
+    };
+  }
+
+  if (modal) modal.show();
 }
